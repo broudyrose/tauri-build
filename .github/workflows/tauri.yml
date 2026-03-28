@@ -12,3 +12,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: npm install
       - run: npm run tauri build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: src-tauri/target/release/bundle/
