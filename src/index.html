@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>showmaster</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+
+  <body>
+    <div id="bg">
+      <div id="bgA" class="bgLayer"></div>
+      <div id="bgB" class="bgLayer"></div>
+      <div id="vignette"></div>
+    </div>
+
+    <div id="viewport">
+      <div id="strip" aria-label="Upcoming posters"></div>
+      <div id="nextBadge">Далее</div>
+<div id="noSessions" style="display:none;">
+  Сегодня сеансов нет!<br>Ждём вас завтра!
+</div>
+
+      <button id="debugRemove" type="button">Убрать</button>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

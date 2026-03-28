@@ -1,0 +1,336 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.35;
+
+  /* цель сцены */
+  --baseW: 1280;
+  --baseH: 704;
+
+  --gap: 16px;
+  --radius: 25px;
+  --cardRadius: var(--radius);
+
+  /* фон */
+  --themeBlur: 15px;
+  --themeOpacity: 1.0;   /* яркость размытой афиши */
+  --vignetteInner: 0.0;
+  --vignetteOuter: 0.5;
+
+  /* акцент */  
+  --nextScale: 1.3;       /* предстоящий шире в 1.3 раза */
+
+  /* ДОБАВЛЕНО */
+  --metaH: 118px;         /* фикс высоты меты (очень важно для baseline) */
+  --cardW: 210px;
+  --cardH: 396px;
+  --stroke: rgba(255,255,255,0.18);
+  --shadow: 2px 2px 10px rgba(0,0,0,0.4);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+}
+
+/* фон */
+#bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+.bgLayer {
+  position: absolute;
+  inset: -40px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(var(--themeBlur));
+  transform: scale(1.0);
+  opacity: 0;
+  transition: opacity 2.7s ease;
+}
+#bgA { opacity: var(--themeOpacity); }
+
+#vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      rgba(0,0,0,var(--vignetteInner)) 0%,
+      rgba(0,0,0,0.28) 55%,
+      rgba(0,0,0,var(--vignetteOuter)) 100%
+    );
+  pointer-events: none;
+}
+
+/* сцена */
+#viewport {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  padding: 44px 44px 56px 44px;
+}
+
+/* ряд карточек */
+#strip {
+  position: absolute;
+  left: 44px;
+  right: 44px;
+  top: 84px;
+  bottom: 120px;
+
+  display: flex;
+  gap: var(--gap);
+  align-items: flex-end; /* ВАЖНО: низ по одной линии */
+}
+
+
+
+/* РАМКА КАРТОЧКИ (как у кнопки "Убрать", поверх афиши) */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--cardRadius);
+  border: 1px solid rgba(255,255,255,0.2); /* как у кнопки */
+  pointer-events: none;
+  z-index: 5; /* поверх постера и меты */
+}
+/* РЕАЛЬНАЯ тень карточки (единственная точка настройки) */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--cardRadius);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  z-index: -1; /* строго за карточкой */
+}
+/* карточка */
+.card {
+  width: var(--cardW);
+  height: var(--cardH);
+  position: relative;
+  z-index: 1;
+  /* layout-бокс всегда одинаковый -> gap фиксированный */
+  overflow: visible;
+  display: flex;
+  align-self: flex-end;
+}
+
+/* pill для времени (на верхней границе карточки) */
+.timePill {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -50%);
+  z-index: 50;
+  pointer-events: none;
+  user-select: none;
+
+  padding: 8px 14px;
+  min-width: 78px;
+  text-align: center;
+
+  font-weight: 900;
+  font-size: 16px;
+  line-height: 1;
+  color: rgba(255,255,255,0.92);
+  text-shadow: 0 2px 14px rgba(0,0,0,0.35);
+
+  /* стиль 1:1 как у карточки */
+  background: rgba(0,0,0,0.28);
+  border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 50px rgba(0,0,0,0.35);
+
+  border-radius: 999px;
+}
+
+/* визуальная рамка карточки (масштабируем её, а не layout-бокс) */
+.frame {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--cardRadius);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  overflow: hidden;
+  --posterBottom: var(--metaH);
+  transform-origin: 100% 100%;
+  transform: scale(1);
+  will-change: transform, opacity, filter;
+  backface-visibility: hidden;
+}
+
+
+
+/* постер */
+.poster {
+  position: relative;
+  z-index: 1;
+
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: var(--posterBottom);
+  width: 100%;
+  overflow: hidden;
+  background: rgba(255,255,255,0.03);
+
+  /* верхние радиусы (на случай если overflow у .frame будет изменён) */
+  border-radius: var(--cardRadius) var(--cardRadius) 0 0;
+}
+.poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* мета */
+.meta {
+  position: relative;
+  z-index: 1;
+
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--metaH);
+  padding: 24px 14px 14px 14px;
+
+  display: grid;
+  grid-auto-rows: min-content;
+  gap: 0px;
+
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.55) 0%,
+    rgba(0,0,0,0.35) 45%,
+    rgba(0,0,0,0.05) 100%
+  )
+  ;
+
+  /* низ карточки */
+  border-radius: 0 0 var(--cardRadius) var(--cardRadius);
+  overflow: hidden;
+
+  /* идеальная компенсация масштаба (из JS) */
+  transform-origin: 100% 100%;
+  transform: scale(1);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.time {
+  font-weight: 800;
+  font-size: 18px;
+  opacity: 0.9;
+  color: rgba(255,255,255,1.0);
+  text-shadow: 0 2px 14px rgba(0,0,0,0.55);
+}
+
+.title {
+  font-weight: 800;
+  font-size: 13px;
+  opacity: 0.85;
+  color: rgba(255,255,255,1.0);
+  text-shadow: 0 2px 14px rgba(0,0,0,0.55);
+
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  /* overflow: hidden; */
+  padding-bottom: 15px; /* чуть больше, чтобы тень меньше резалась */
+}
+
+/* бейдж "Далее" */
+#nextBadge {
+  position: absolute;
+  left: 60px;
+  top: 60px;
+  padding: 10px 16px;
+  /* border-radius: 999px; */
+  /* background: rgba(0,0,0,0.32); */
+  /* border: 1px solid rgba(255,255,255,0.16); */
+  /* backdrop-filter: blur(10px); */
+
+  font-weight: 900;
+  font-size: 30px; /* ~1.5x */
+  color: rgba(255,255,255,0.92);
+  text-shadow: 0 2px 14px rgba(0,0,0,0.3);
+  /* box-shadow: 0 16px 50px rgba(0,0,0,0.35); */
+
+  pointer-events: none;
+  user-select: none;
+}
+
+/* кнопка отладки */
+#debugRemove {
+  position: absolute;
+  left: 44px;
+  bottom: 48px;
+  padding: 12px 18px;
+  border-radius: 12px;
+
+  background: rgba(0,0,0,0.28);
+  color: rgba(255,255,255,0.9);
+  border: 1px solid rgba(255,255,255,0.16);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 50px rgba(0,0,0,0.35);
+
+  font-weight: 700;
+  cursor: pointer;
+}
+#debugRemove:active { transform: translateY(1px); }
+
+/* ghost-strip (чтобы убрать моргание) */
+#stripGhost {
+  position: absolute;
+  left: 44px;
+  right: 44px;
+  top: 84px;
+  bottom: 120px;
+  display: flex;
+  gap: var(--gap);
+  align-items: flex-end;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+#noSessions {
+  position: absolute;
+  left: 60px;
+  top: 110px; /* ниже "Далее" */
+  font-weight: 900;
+  font-size: 24px;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 2px 14px rgba(0,0,0,0.35);
+  pointer-events: none;
+  user-select: none;
+  display: none;
+}
+
+/* === FIX: opacity/blur animation must not affect .timePill === */
+.cardBody{
+  position:absolute;
+  inset:0;
+  border-radius: var(--cardRadius);
+  overflow:hidden; /* чтобы постер/мета резались по радиусу */
+}
+.timePill{
+  opacity: 1; /* на случай если где-то будет opacity на родителе */
+}
