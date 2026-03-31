@@ -17,3 +17,4 @@ jobs:
         with:
           name: build
           path: src-tauri/target/release/*.exe
+          
