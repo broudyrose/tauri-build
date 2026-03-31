@@ -17,24 +17,21 @@ struct PosterItem {
     poster_data_url: Option<String>, // "data:image/jpeg;base64,...."
 }
 
-fn find_project_root() -> Result<PathBuf, String> {
-    let mut dir = std::env::current_dir().map_err(|e| e.to_string())?;
+fn find_project_root() -> Option<PathBuf> {
+    let mut dir = std::env::current_dir().ok()?;
 
-    // Ищем вверх по дереву: где лежит db.db и папка media
     for _ in 0..10 {
         let db = dir.join("db.db");
         let media = dir.join("media");
         if db.exists() && media.exists() {
-            return Ok(dir);
+            return Some(dir);
         }
 
-        let Some(parent) = dir.parent() else {
-            break;
-        };
+        let parent = dir.parent()?;
         dir = parent.to_path_buf();
     }
 
-    Err("Не нашёл db.db и папку media ни в текущей папке, ни выше. Запускай `npm run tauri dev` из корня проекта (там где db.db и media).".to_string())
+    None
 }
 
 fn read_poster_as_data_url(project_root: &Path, film_id: i64) -> Option<String> {
@@ -48,94 +45,68 @@ fn read_poster_as_data_url(project_root: &Path, film_id: i64) -> Option<String> 
     Some(format!("data:image/jpeg;base64,{}", b64))
 }
 
-fn normalize_hhmm(now: &str) -> Result<String, String> {
-    // Ждём "HH:MM"
+fn normalize_hhmm(now: &str) -> Option<String> {
     if now.len() != 5 || &now[2..3] != ":" {
-        return Err(format!("now должен быть в формате HH:MM, получил: {}", now));
+        return None;
     }
     let hh = &now[0..2];
     let mm = &now[3..5];
     if !hh.chars().all(|c| c.is_ascii_digit()) || !mm.chars().all(|c| c.is_ascii_digit()) {
-        return Err(format!("now должен быть в формате HH:MM, получил: {}", now));
+        return None;
     }
-    Ok(now.to_string())
+    Some(now.to_string())
 }
 
 #[tauri::command]
-fn get_upcoming_posters(limit: Option<u32>, now: String) -> Result<Vec<PosterItem>, String> {
+fn get_upcoming_posters(limit: Option<u32>, now: String) -> Vec<PosterItem> {
     let limit = limit.unwrap_or(5).min(20) as i64;
-    let now = normalize_hhmm(&now)?;
+    let Some(now) = normalize_hhmm(&now) else {
+        return Vec::new();
+    };
 
-    let project_root = find_project_root()?;
+    let Some(project_root) = find_project_root() else {
+        return Vec::new();
+    };
+
     let db_path = project_root.join("db.db");
-    let conn = rusqlite::Connection::open(db_path).map_err(|e| e.to_string())?;
+    let Ok(conn) = rusqlite::Connection::open(db_path) else {
+        return Vec::new();
+    };
 
-    // 1) Пытаемся взять "предстоящие сегодня"
-    let mut stmt = conn
-        .prepare(
-            r#"
-            SELECT rid, id, title, time
-            FROM rotation_view
-            WHERE time >= ?1
-            ORDER BY time ASC
-            LIMIT ?2
-            "#,
-        )
-        .map_err(|e| e.to_string())?;
+    let Ok(mut stmt) = conn.prepare(
+        r#"
+        SELECT rid, id, title, time
+        FROM rotation_view
+        WHERE time >= ?1
+        ORDER BY time ASC
+        LIMIT ?2
+        "#,
+    ) else {
+        return Vec::new();
+    };
 
-    let rows = stmt
-        .query_map(rusqlite::params![now.clone(), limit], |row| {
-            Ok(PosterItem {
-                rid: row.get(0)?,
-                id: row.get(1)?,
-                title: row.get(2)?,
-                time: row.get(3)?,
-                poster_data_url: None,
-            })
+    let Ok(rows) = stmt.query_map(rusqlite::params![now, limit], |row| {
+        Ok(PosterItem {
+            rid: row.get(0)?,
+            id: row.get(1)?,
+            title: row.get(2)?,
+            time: row.get(3)?,
+            poster_data_url: None,
         })
-        .map_err(|e| e.to_string())?;
+    }) else {
+        return Vec::new();
+    };
 
     let mut items: Vec<PosterItem> = Vec::new();
     for item in rows {
-        let mut item = item.map_err(|e| e.to_string())?;
+        let Ok(mut item) = item else {
+            return Vec::new();
+        };
         item.poster_data_url = read_poster_as_data_url(&project_root, item.id);
         items.push(item);
     }
 
-    // 2) Если "предстоящих" нет — значит день закончился.
-    // Тогда показываем "первые по времени" (условно следующий день).
-    if items.is_empty() {
-        let mut stmt2 = conn
-            .prepare(
-                r#"
-                SELECT rid, id, title, time
-                FROM rotation_view
-                ORDER BY time ASC
-                LIMIT ?1
-                "#,
-            )
-            .map_err(|e| e.to_string())?;
-
-        let rows2 = stmt2
-            .query_map([limit], |row| {
-                Ok(PosterItem {
-                    rid: row.get(0)?,
-                    id: row.get(1)?,
-                    title: row.get(2)?,
-                    time: row.get(3)?,
-                    poster_data_url: None,
-                })
-            })
-            .map_err(|e| e.to_string())?;
-
-        for item in rows2 {
-            let mut item = item.map_err(|e| e.to_string())?;
-            item.poster_data_url = read_poster_as_data_url(&project_root, item.id);
-            items.push(item);
-        }
-    }
-
-    Ok(items)
+    items
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

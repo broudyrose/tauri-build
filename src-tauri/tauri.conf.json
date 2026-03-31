@@ -15,9 +15,13 @@
         "height": 704,
         "minWidth": 1280,
         "minHeight": 704,
-        "resizable": false,
+        "maxWidth": 1280,
+        "maxHeight": 704,
         "center": true,
-        "transparent": false
+        "fullscreen": false,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true
       }
     ],
     "security": {

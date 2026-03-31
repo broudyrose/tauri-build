@@ -1,4 +1,4 @@
-const AUTO_POLL = false;
+const AUTO_POLL = true;  // debug
 const POLL_MS = 2000;
 
 const DURATION_MS = 2600;
@@ -39,7 +39,6 @@ function cssPxVar(name, fallback) {
 }
 
 function metaH() {
-  // --metaH может быть px, parseFloat хватает
   return cssPxVar("--metaH", 118);
 }
 
@@ -92,14 +91,13 @@ function placeNoSessionsAtFirstSlot() {
   const el = document.getElementById("noSessions");
   const viewportEl = document.getElementById("viewport");
   const stripEl = document.getElementById("strip");
-  const slot = document.querySelector("#strip .card"); // первая позиция (в т.ч. placeholder)
+  const slot = document.querySelector("#strip .card");
   if (!el || !viewportEl || !stripEl || !slot) return;
 
   const v = viewportEl.getBoundingClientRect();
   const r = slot.getBoundingClientRect();
   const s = stripEl.getBoundingClientRect();
 
-  // Полоса от левого края первой карточки до правого края ряда
   const left = r.left - v.left;
   const top = r.top - v.top;
   const width = Math.max(0, s.right - r.left);
@@ -183,10 +181,8 @@ function renderFive(items) {
 
   strip.innerHTML = base.map((x, i) => cardHtml(x, i === 0)).join("");
 
-  // прячем/схлопываем пустые карточки (id=0) по режиму
   hidePlaceholders();
 
-  // z-index ставим по порядку только для видимых
   const visible = [...strip.querySelectorAll('.card:not([data-id="0"])')];
   visible.forEach((el, i) => (el.style.zIndex = String(1000 - i)));
 
@@ -205,11 +201,9 @@ function hidePlaceholders() {
 
   strip.querySelectorAll('.card[data-id="0"]').forEach((el) => {
     if (hasAnyReal) {
-      // как было: полностью убираем пустые карточки
       el.style.display = "none";
       el.style.visibility = "";
     } else {
-      // НЕТ сеансов: оставляем layout (позиции) но не показываем карточки
       el.style.display = "";
       el.style.visibility = "hidden";
     }
@@ -217,28 +211,31 @@ function hidePlaceholders() {
 }
 
 /* =========================
-   BADGE ("Далее") follows first card position (but is not inside card)
+   BADGE ("Далее")
 ========================= */
 function positionNextBadge() {
   if (animating) return;
+
   const badge = document.getElementById("nextBadge");
   const viewport = document.getElementById("viewport");
-  const first = document.querySelector('#strip .card:not([data-id="0"])');
+  const firstReal = document.querySelector('#strip .card:not([data-id="0"])');
+  const firstSlot = document.querySelector('#strip .card');
+  const target = firstReal || firstSlot;
 
-  if (!badge || !viewport || !first) return;
+  if (!badge || !viewport || !target) return;
 
   const v = viewport.getBoundingClientRect();
-  const r = first.getBoundingClientRect();
+  const r = target.getBoundingClientRect();
   const pad = 16;
 
   badge.style.left = `${r.left - v.left + pad - 30}px`;
-  badge.style.top  = `${r.top  - v.top  + pad - 70}px`;
+  badge.style.top = `${r.top - v.top + pad - 85}px`;
 }
 
 /* =========================
    DATA
 ========================= */
-async function fetchUpcoming(invoke, limit = 5, nowOverride = null) {
+async function fetchUpcoming(invoke, limit = 10, nowOverride = null) {
   if (inFlight) return null;
   inFlight = true;
   try {
@@ -261,8 +258,7 @@ function computeNextFromFetched(fetched) {
 }
 
 /* =========================
-   GEOMETRY (baseline-based)
-   baseline = bottom - metaH (нижняя граница постера)
+   GEOMETRY
 ========================= */
 function captureRects() {
   const viewport = document.getElementById("viewport").getBoundingClientRect();
@@ -280,13 +276,11 @@ function captureRects() {
     const height = r.height;
 
     const bottom = top + height;
-    const baseY = bottom - mh; // линия "основания афиши"
+    const baseY = bottom - mh;
 
     map.set(rid, { left, top, bottom, width, height, baseY });
   }
 
-  // + noSessions как участник FLIP (берём геометрию ПЕРВОЙ карточки,
-  // чтобы движение было 1-в-1 как у карточки, но ширина надписи может быть любой)
   const ns = document.getElementById("noSessions");
   if (ns && getComputedStyle(ns).display !== "none") {
     const slot = document.querySelector("#strip .card");
@@ -309,7 +303,7 @@ function captureRects() {
 }
 
 /* =========================
-   GHOSTS (no blink)
+   GHOSTS
 ========================= */
 function makeStripGhost() {
   const viewportEl = document.getElementById("viewport");
@@ -318,24 +312,11 @@ function makeStripGhost() {
 
   const ghost = document.createElement("div");
   ghost.id = "stripGhost";
-  ghost.innerHTML = strip.innerHTML; // слепок старого ряда
+  ghost.innerHTML = strip.innerHTML;
 
   viewportEl.appendChild(ghost);
   return ghost;
 }
-
-function fadeOutAndRemove(el) {
-  if (!el) return;
-  el.animate([{ opacity: 1 }, { opacity: 0 }], {
-    duration: 160,
-    easing: "linear",
-    fill: "forwards",
-  }).onfinish = () => el.remove();
-}
-
-/* =========================
-   GHOST of old first (fly-out)
-========================= */
 
 function makeGhostOfNoSessions() {
   const ns = document.getElementById("noSessions");
@@ -358,7 +339,6 @@ function makeGhostOfNoSessions() {
   viewportEl.appendChild(ghost);
   return ghost;
 }
-
 
 function makeGhostOfFirst() {
   const viewportEl = document.getElementById("viewport");
@@ -387,8 +367,6 @@ function updateNoSessionsText(items, keepShown = false) {
   if (!el) return;
 
   const want = !hasRealSessions(items);
-
-  // если хотим скрыть, но идет анимация "ухода" — держим видимым до конца
   el.style.display = (want || keepShown) ? "block" : "none";
 
   if (el.style.display !== "none") {
@@ -405,10 +383,8 @@ function runFlipTransition(next5) {
 
   if (!current.length) {
     current = next5;
-
     renderFive(current);
     updateNoSessionsText(current, false);
-
     setThemeFromFirst(current);
     positionNextBadge();
     return;
@@ -428,35 +404,25 @@ function runFlipTransition(next5) {
 
   setThemeFromFirst(next5);
 
-  // 0) делаем слепок старого ряда, чтобы НЕ было моргания
   const stripGhost = makeStripGhost();
 
-  // noSessions BEFORE
   updateNoSessionsText(current, false);
   placeNoSessionsAtFirstSlot();
 
-  // 1) capture BEFORE
   const start = captureRects();
-
-  // 2) ghost of old first
   const ghost = makeGhostOfFirst();
 
-  // 3) render AFTER
   renderFive(next5);
   applyZByOrder(nextRid);
 
-  // noSessions AFTER (держим при уходе)
   updateNoSessionsText(next5, (!willNoSessions && wasNoSessions));
   placeNoSessionsAtFirstSlot();
 
-  // 4) capture AFTER
   const end = captureRects();
 
-  // "новые" элементы стартуют как будто это 6-я карточка справа
   const newRids = new Set();
   for (const [rid, e] of end.map.entries()) {
     if (rid === NOSESS_RID) {
-      // Надпись должна появляться так же, как "новая карточка" (с правого края)
       if (!start.map.has(NOSESS_RID)) {
         newRids.add(NOSESS_RID);
         start.map.set(NOSESS_RID, {
@@ -479,7 +445,7 @@ function runFlipTransition(next5) {
         bottom: e.bottom,
         width: e.width,
         height: e.height,
-        baseY: e.baseY, // держим baseline
+        baseY: e.baseY,
       });
     }
   }
@@ -488,7 +454,6 @@ function runFlipTransition(next5) {
   const noSessionsEl = document.getElementById("noSessions");
   const animEls = noSessionsEl ? [...newCards, noSessionsEl] : [...newCards];
 
-  // 5) invert transforms (по baseline, а не по bottom)
   for (const el of animEls) {
     const rid = el.classList?.contains("card") ? el.dataset.rid : NOSESS_RID;
     const s = start.map.get(rid);
@@ -498,7 +463,6 @@ function runFlipTransition(next5) {
     let sx = s.width / e.width;
     let sy = s.height / e.height;
 
-    // убираем микроскейл (дрожание текста)
     if (Math.abs(sx - 1) < 0.003) sx = 1;
     if (Math.abs(sy - 1) < 0.003) sy = 1;
 
@@ -507,63 +471,43 @@ function runFlipTransition(next5) {
 
     el.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(${sx}, ${sy})`;
 
-    if (el.classList?.contains("card")) {
-      if (newRids.has(rid)) {
-        el.style.opacity = "0";
-        el.style.filter = "blur(2px)";
-      } else {
-        el.style.opacity = "1";
-        el.style.filter = "blur(0px)";
-      }
+    if (newRids.has(rid) || (!el.classList?.contains("card") && newRids.has(NOSESS_RID))) {
+      el.style.opacity = "0";
+      el.style.filter = "blur(2px)";
     } else {
-      // noSessions
-      if (newRids.has(NOSESS_RID)) {
-        el.style.opacity = "0";
-        el.style.filter = "blur(2px)";
-      } else {
-        el.style.opacity = "1";
-        el.style.filter = "blur(0px)";
-      }
+      el.style.opacity = "1";
+      el.style.filter = "blur(0px)";
     }
   }
 
-  // 6) reflow
   void strip.offsetWidth;
 
-  // 7) старый слепок убираем чуть позже, чтобы вообще не было “пустого кадра”
   if (ghost) {
-    ghost
-      .animate(
+    ghost.animate(
+      [
+        { transform: "translate3d(0px,0px,0) scale(1)", opacity: 1, filter: "blur(0px)" },
+        { transform: "translate3d(-230px,0px,0) scale(0.9)", opacity: 0, filter: "blur(10px)" },
+      ],
+      { duration: DURATION_MS, easing: EASE, fill: "forwards" }
+    ).onfinish = () => ghost.remove();
+  }
+
+  if (wasNoSessions && !willNoSessions) {
+    const ns = document.getElementById("noSessions");
+    const nsGhost = makeGhostOfNoSessions();
+    if (ns && nsGhost) {
+      ns.style.display = "none";
+
+      nsGhost.animate(
         [
           { transform: "translate3d(0px,0px,0) scale(1)", opacity: 1, filter: "blur(0px)" },
           { transform: "translate3d(-230px,0px,0) scale(0.9)", opacity: 0, filter: "blur(10px)" },
         ],
         { duration: DURATION_MS, easing: EASE, fill: "forwards" }
-      )
-      .onfinish = () => ghost.remove();
-  }
-
-  // noSessions уезжает ТОЧНО как карточка (через ghost)
-  if (wasNoSessions && !willNoSessions) {
-    const ns = document.getElementById("noSessions");
-    const nsGhost = makeGhostOfNoSessions();
-    if (ns && nsGhost) {
-      // оригинал сразу прячем, анимацию делает ghost
-      ns.style.display = "none";
-
-      nsGhost
-        .animate(
-          [
-            { transform: "translate3d(0px,0px,0) scale(1)", opacity: 1, filter: "blur(0px)" },
-            { transform: "translate3d(-230px,0px,0) scale(0.9)", opacity: 0, filter: "blur(10px)" },
-          ],
-          { duration: DURATION_MS, easing: EASE, fill: "forwards" }
-        )
-        .onfinish = () => nsGhost.remove();
+      ).onfinish = () => nsGhost.remove();
     }
   }
 
-  // 8) start animations cleanly (no extra frame)
   requestAnimationFrame(() => {
     if (stripGhost) stripGhost.remove();
 
@@ -601,11 +545,11 @@ function runFlipTransition(next5) {
 }
 
 /* =========================
-   DEBUG REMOVE (button)
+   DEBUG REMOVE
 ========================= */
 async function debugRemoveFirst(invoke) {
   if (animating) return;
-  const fetched = await fetchUpcoming(invoke, 2500, "00:00");
+  const fetched = await fetchUpcoming(invoke, 10);
   if (!fetched || !fetched.length) return;
 
   const next5 = computeNextFromFetched(fetched);
@@ -618,15 +562,83 @@ async function debugRemoveFirst(invoke) {
    INIT
 ========================= */
 window.addEventListener("DOMContentLoaded", async () => {
-  const invoke = await getInvoke();
+  // window controls
+  (() => {
+    const btnMove = document.getElementById("moveWin");
+    const btnClose = document.getElementById("closeWin");
 
-  const first = await fetchUpcoming(invoke, 5);
-  if (first) {
-    current = normalizeToFive(first);
-    renderFive(current);
-    updateNoSessionsText(current, false);
-    setThemeFromFirst(current);
-    positionNextBadge();
+    if (btnMove) btnMove.style.display = "none";
+
+    const w = window.__TAURI__?.window;
+    if (!w) return;
+
+    const getNextMonitor = async () => {
+      const win = w.getCurrentWindow();
+      const monitors = await win.availableMonitors();
+      const cur = await win.currentMonitor();
+      if (!cur) return null;
+
+      return monitors.find(m =>
+        m.name !== cur.name ||
+        m.position?.x !== cur.position?.x ||
+        m.position?.y !== cur.position?.y ||
+        m.size?.width !== cur.size?.width ||
+        m.size?.height !== cur.size?.height
+      ) || null;
+    };
+
+    if (btnClose) {
+      btnClose.addEventListener("click", async () => {
+        try {
+          await w.getCurrentWindow().close();
+        } catch (e) {
+          console.error("closeWin error:", e);
+        }
+      });
+    }
+
+    if (btnMove) {
+      btnMove.addEventListener("click", async () => {
+        try {
+          const win = w.getCurrentWindow();
+          const next = await getNextMonitor();
+          if (next) await win.setPosition(next.position);
+        } catch (e) {
+          console.error("moveWin error:", e);
+        }
+      });
+
+      (async () => {
+        try {
+          const next = await getNextMonitor();
+          btnMove.style.display = next ? "" : "none";
+        } catch (e) {
+          console.error("moveWin detect error:", e);
+          btnMove.style.display = "none";
+        }
+      })();
+    }
+  })();
+
+  let invoke;
+  try {
+    invoke = await getInvoke();
+  } catch (e) {
+    console.error("getInvoke error:", e);
+    return;
+  }
+
+  try {
+    const first = await fetchUpcoming(invoke, 10);
+    if (first) {
+      current = normalizeToFive(first);
+      renderFive(current);
+      updateNoSessionsText(current, false);
+      setThemeFromFirst(current);
+      positionNextBadge();
+    }
+  } catch (e) {
+    console.error("initial fetchUpcoming error:", e);
   }
 
   window.addEventListener("resize", () => {
@@ -636,13 +648,17 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   if (AUTO_POLL) {
     setInterval(async () => {
-      const fetched = await fetchUpcoming(invoke, 250, "00:00");
-      if (!fetched) return;
-      runFlipTransition(normalizeToFive(fetched.slice(0, 5)));
+      try {
+        const fetched = await fetchUpcoming(invoke, 10);
+        if (!fetched) return;
+        runFlipTransition(normalizeToFive(fetched.slice(0, 5)));
+      } catch (e) {
+        console.error("poll fetchUpcoming error:", e);
+      }
     }, POLL_MS);
   }
 
-  document
-    .getElementById("debugRemove")
-    ?.addEventListener("click", () => debugRemoveFirst(invoke));
+  document.getElementById("debugRemove")?.addEventListener("click", () => {
+    debugRemoveFirst(invoke).catch((e) => console.error("debugRemove error:", e));
+  });
 });
