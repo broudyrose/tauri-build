@@ -1,3 +1,4 @@
+use tauri::Manager;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -113,6 +114,12 @@ fn get_upcoming_posters(limit: Option<u32>, now: String) -> Vec<PosterItem> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = place_window_on_preferred_monitor(&window);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             get_upcoming_posters,
@@ -210,6 +217,40 @@ fn move_window_to_next_monitor(window: tauri::Window) -> Result<(), String> {
 
     let _outer1 = window.outer_size().map_err(|e| e.to_string())?;
     std::thread::sleep(std::time::Duration::from_millis(20));
+    let outer = window.outer_size().map_err(|e| e.to_string())?;
+
+    let x = area.position.x + ((area.size.width as i32 - outer.width as i32) / 2);
+    let y = area.position.y + ((area.size.height as i32 - outer.height as i32) / 2);
+
+    window
+        .set_position(PhysicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+
+fn place_window_on_preferred_monitor(window: &tauri::WebviewWindow) -> Result<(), String> {
+    use tauri::{LogicalSize, PhysicalPosition};
+
+    let monitors = window.available_monitors().map_err(|e| e.to_string())?;
+    if monitors.is_empty() {
+        return Ok(());
+    }
+
+    let target = if monitors.len() > 1 {
+        &monitors[1]
+    } else {
+        &monitors[0]
+    };
+
+    window
+        .set_size(LogicalSize::new(1280.0, 704.0))
+        .map_err(|e| e.to_string())?;
+
+    std::thread::sleep(std::time::Duration::from_millis(80));
+
+    let area = target.work_area();
     let outer = window.outer_size().map_err(|e| e.to_string())?;
 
     let x = area.position.x + ((area.size.width as i32 - outer.width as i32) / 2);
