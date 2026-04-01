@@ -643,16 +643,6 @@ btnMove.addEventListener("click", async () => {
     try { await invoke("show_window"); } catch {}
   }
 });
-      (async () => {
-        try {
-          const win = w.getCurrentWindow();
-          const monitors = await win.availableMonitors();
-          btnMove.style.display = monitors.length > 1 ? "" : "none";
-        } catch (e) {
-          console.error("moveWin detect error:", e);
-          btnMove.style.display = "none";
-        }
-      })();
     }
   })();
 
