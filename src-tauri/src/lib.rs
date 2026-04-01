@@ -113,7 +113,58 @@ fn get_upcoming_posters(limit: Option<u32>, now: String) -> Vec<PosterItem> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, get_upcoming_posters])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            get_upcoming_posters,
+            toggle_window_size_and_center,
+            show_window
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+
+#[tauri::command]
+fn toggle_window_size_and_center(window: tauri::Window, compact: bool) -> Result<(), String> {
+    use tauri::{LogicalSize, PhysicalPosition};
+
+    let (target_w, target_h) = if compact {
+        (640.0, 352.0)
+    } else {
+        (1280.0, 704.0)
+    };
+
+    window.hide().map_err(|e| e.to_string())?;
+
+    window
+        .set_size(LogicalSize::new(target_w, target_h))
+        .map_err(|e| e.to_string())?;
+
+    std::thread::sleep(std::time::Duration::from_millis(80));
+
+    if let Some(monitor) = window.current_monitor().map_err(|e| e.to_string())? {
+        let area = monitor.work_area();
+
+        let _outer1 = window.outer_size().map_err(|e| e.to_string())?;
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let outer = window.outer_size().map_err(|e| e.to_string())?;
+
+        let x = area.position.x + ((area.size.width as i32 - outer.width as i32) / 2);
+        let y = area.position.y + ((area.size.height as i32 - outer.height as i32) / 2);
+
+        window
+            .set_position(PhysicalPosition::new(x, y))
+            .map_err(|e| e.to_string())?;
+    } else {
+        window.center().map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn show_window(window: tauri::Window) -> Result<(), String> {
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
 }

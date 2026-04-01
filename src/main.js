@@ -8,6 +8,36 @@ let current = [];
 let inFlight = false;
 let animating = false;
 
+const FULL_W = 1280;
+const FULL_H = 704;
+const MINI_W = 640;
+const MINI_H = 352;
+
+let compactMode = false;
+
+function applyViewportScale() {
+  const scene = document.getElementById("scene");
+  if (!scene) return;
+  scene.style.transform = `scale(${compactMode ? 0.5 : 1})`;
+}
+
+function showScene() {
+  const scene = document.getElementById("scene");
+  if (!scene) return;
+  scene.style.visibility = "visible";
+}
+
+async function syncCompactModeFromWindow() {
+  const w = window.__TAURI__?.window;
+  if (!w) return;
+
+  try {
+    const win = w.getCurrentWindow();
+    const size = await win.innerSize();
+    compactMode = size.width <= MINI_W + 4 && size.height <= MINI_H + 4;
+  } catch (_) {}
+}
+
 /* =========================
    TIME
 ========================= */
@@ -89,19 +119,14 @@ const NOSESS_RID = "__noSessions__";
 
 function placeNoSessionsAtFirstSlot() {
   const el = document.getElementById("noSessions");
-  const viewportEl = document.getElementById("viewport");
   const stripEl = document.getElementById("strip");
   const slot = document.querySelector("#strip .card");
-  if (!el || !viewportEl || !stripEl || !slot) return;
+  if (!el || !stripEl || !slot) return;
 
-  const v = viewportEl.getBoundingClientRect();
-  const r = slot.getBoundingClientRect();
-  const s = stripEl.getBoundingClientRect();
-
-  const left = r.left - v.left;
-  const top = r.top - v.top;
-  const width = Math.max(0, s.right - r.left);
-  const height = r.height;
+  const left = slot.offsetLeft + 45;
+  const top = slot.offsetTop + 70;
+  const width = Math.max(0, stripEl.clientWidth - slot.offsetLeft);
+  const height = slot.offsetHeight;
 
   el.style.position = "absolute";
   el.style.left = `${left}px`;
@@ -217,19 +242,15 @@ function positionNextBadge() {
   if (animating) return;
 
   const badge = document.getElementById("nextBadge");
-  const viewport = document.getElementById("viewport");
   const firstReal = document.querySelector('#strip .card:not([data-id="0"])');
   const firstSlot = document.querySelector('#strip .card');
   const target = firstReal || firstSlot;
 
-  if (!badge || !viewport || !target) return;
+  if (!badge || !target) return;
 
-  const v = viewport.getBoundingClientRect();
-  const r = target.getBoundingClientRect();
   const pad = 16;
-
-  badge.style.left = `${r.left - v.left + pad - 30}px`;
-  badge.style.top = `${r.top - v.top + pad - 85}px`;
+  badge.style.left = `${target.offsetLeft + pad + 15}px`;
+  badge.style.top = `${target.offsetTop + pad - 5}px`;
 }
 
 /* =========================
@@ -261,7 +282,7 @@ function computeNextFromFetched(fetched) {
    GEOMETRY
 ========================= */
 function captureRects() {
-  const viewport = document.getElementById("viewport").getBoundingClientRect();
+  const viewport = document.getElementById("scene").getBoundingClientRect();
   const cards = [...document.querySelectorAll("#strip .card")];
   const mh = metaH();
 
@@ -306,7 +327,7 @@ function captureRects() {
    GHOSTS
 ========================= */
 function makeStripGhost() {
-  const viewportEl = document.getElementById("viewport");
+  const viewportEl = document.getElementById("scene");
   const strip = document.getElementById("strip");
   if (!viewportEl || !strip) return null;
 
@@ -320,7 +341,7 @@ function makeStripGhost() {
 
 function makeGhostOfNoSessions() {
   const ns = document.getElementById("noSessions");
-  const viewportEl = document.getElementById("viewport");
+  const viewportEl = document.getElementById("scene");
   if (!ns || !viewportEl) return null;
 
   const v = viewportEl.getBoundingClientRect();
@@ -341,7 +362,7 @@ function makeGhostOfNoSessions() {
 }
 
 function makeGhostOfFirst() {
-  const viewportEl = document.getElementById("viewport");
+  const viewportEl = document.getElementById("scene");
   const first = document.querySelector("#strip .card");
   if (!viewportEl || !first) return null;
 
@@ -628,20 +649,30 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+    await syncCompactModeFromWindow();
+    applyViewportScale();
+
   try {
     const first = await fetchUpcoming(invoke, 10);
-    if (first) {
+      if (first) {
       current = normalizeToFive(first);
       renderFive(current);
       updateNoSessionsText(current, false);
       setThemeFromFirst(current);
       positionNextBadge();
+      showScene();
+    } else {
+      showScene();
     }
   } catch (e) {
     console.error("initial fetchUpcoming error:", e);
+    showScene();
   }
 
+  applyViewportScale();
+
   window.addEventListener("resize", () => {
+    applyViewportScale();
     positionNextBadge();
     placeNoSessionsAtFirstSlot();
   });
@@ -661,4 +692,69 @@ window.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("debugRemove")?.addEventListener("click", () => {
     debugRemoveFirst(invoke).catch((e) => console.error("debugRemove error:", e));
   });
+
+    // drag + double click resize
+    // drag + double click resize
+  const w = window.__TAURI__?.window;
+  const viewport = document.getElementById("scene");
+  const dpi = window.__TAURI__?.dpi || await import("@tauri-apps/api/dpi");
+
+  let dragStart = null;
+  let dragStarted = false;
+
+  viewport?.addEventListener("pointerdown", (e) => {
+    if (!w || e.button !== 0) return;
+    if (e.target.closest("#closeWin, #moveWin")) return;
+    dragStart = { x: e.clientX, y: e.clientY };
+    dragStarted = false;
+  });
+
+  viewport?.addEventListener("pointermove", async (e) => {
+    if (!w || !dragStart || dragStarted) return;
+
+    const dx = Math.abs(e.clientX - dragStart.x);
+    const dy = Math.abs(e.clientY - dragStart.y);
+
+    if (dx > 4 || dy > 4) {
+      dragStarted = true;
+      dragStart = null;
+      try {
+        await w.getCurrentWindow().startDragging();
+      } catch (e) {
+        console.error("startDragging error:", e);
+      }
+    }
+  });
+
+  const stopPointer = () => {
+    dragStart = null;
+    dragStarted = false;
+  };
+
+  viewport?.addEventListener("pointerup", stopPointer);
+  viewport?.addEventListener("pointercancel", stopPointer);
+  viewport?.addEventListener("pointerleave", stopPointer);
+
+viewport?.addEventListener("click", async (e) => {
+  if (!w) return;
+  if (e.target.closest("#closeWin, #moveWin")) return;
+
+  stopPointer();
+
+  try {
+    compactMode = !compactMode;
+
+    await invoke("toggle_window_size_and_center", { compact: compactMode });
+
+    applyViewportScale();
+    positionNextBadge();
+    placeNoSessionsAtFirstSlot();
+
+    await invoke("show_window");
+  } catch (e) {
+    compactMode = !compactMode;
+    console.error("toggle size/center error:", e);
+    try { await invoke("show_window"); } catch {}
+  }
+});
 });

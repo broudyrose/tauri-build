@@ -10,17 +10,19 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "showmaster",
         "width": 1280,
         "height": 704,
-        "minWidth": 1280,
-        "minHeight": 704,
+        "minWidth": 640,
+        "minHeight": 352,
         "maxWidth": 1280,
         "maxHeight": 704,
         "center": true,
         "fullscreen": false,
         "resizable": false,
         "decorations": false,
+        "shadow": false,
         "alwaysOnTop": true
       }
     ],
