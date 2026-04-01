@@ -77,7 +77,7 @@ fn get_upcoming_posters(limit: Option<u32>, now: String) -> Vec<PosterItem> {
         r#"
         SELECT rid, id, title, time
         FROM rotation_view
-        WHERE time >= ?1
+        WHERE time > ?1
         ORDER BY time ASC
         LIMIT ?2
         "#,

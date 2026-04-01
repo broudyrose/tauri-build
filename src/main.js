@@ -1,5 +1,5 @@
 const AUTO_POLL = true;  // debug
-const POLL_MS = 2000;
+const POLL_MS = 1000;
 
 const DURATION_MS = 2600;
 const EASE = "cubic-bezier(0.4, 0.0, 0.2, 1)";
@@ -165,6 +165,20 @@ function hasRealSessions(items) {
 function sameSequence(a, b) {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i].rid !== b[i].rid) return false;
+  return true;
+}
+
+function sameContent(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (
+      a[i].rid !== b[i].rid ||
+      a[i].id !== b[i].id ||
+      a[i].time !== b[i].time ||
+      a[i].title !== b[i].title ||
+      a[i].poster_data_url !== b[i].poster_data_url
+    ) return false;
+  }
   return true;
 }
 
@@ -411,7 +425,16 @@ function runFlipTransition(next5) {
     return;
   }
 
-  if (sameSequence(current, next5)) return;
+  if (sameSequence(current, next5)) {
+    if (sameContent(current, next5)) return;
+
+    current = next5;
+    renderFive(current);
+    updateNoSessionsText(current, false);
+    setThemeFromFirst(current);
+    positionNextBadge();
+    return;
+  }
 
   const wasNoSessions = !hasRealSessions(current);
   const willNoSessions = !hasRealSessions(next5);
@@ -682,7 +705,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       try {
         const fetched = await fetchUpcoming(invoke, 10);
         if (!fetched) return;
-        runFlipTransition(normalizeToFive(fetched.slice(0, 5)));
+        runFlipTransition(normalizeToFive(fetched));
       } catch (e) {
         console.error("poll fetchUpcoming error:", e);
       }
