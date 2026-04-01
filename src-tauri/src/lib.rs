@@ -117,7 +117,8 @@ pub fn run() {
             greet,
             get_upcoming_posters,
             toggle_window_size_and_center,
-            show_window
+            show_window,
+            move_window_to_next_monitor
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -166,5 +167,57 @@ fn toggle_window_size_and_center(window: tauri::Window, compact: bool) -> Result
 fn show_window(window: tauri::Window) -> Result<(), String> {
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+
+
+#[tauri::command]
+fn move_window_to_next_monitor(window: tauri::Window) -> Result<(), String> {
+    use tauri::{LogicalSize, PhysicalPosition};
+
+    let monitors = window.available_monitors().map_err(|e| e.to_string())?;
+    if monitors.is_empty() {
+        return Ok(());
+    }
+
+    let current = window
+        .current_monitor()
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| monitors[0].clone());
+
+    let current_idx = monitors.iter().position(|m| {
+        m.position() == current.position()
+            && m.size() == current.size()
+            && m.name() == current.name()
+    }).unwrap_or(0);
+
+    let next = if monitors.len() > 1 {
+        &monitors[(current_idx + 1) % monitors.len()]
+    } else {
+        &monitors[current_idx]
+    };
+
+    window.hide().map_err(|e| e.to_string())?;
+
+    window
+        .set_size(LogicalSize::new(1280.0, 704.0))
+        .map_err(|e| e.to_string())?;
+
+    std::thread::sleep(std::time::Duration::from_millis(80));
+
+    let area = next.work_area();
+
+    let _outer1 = window.outer_size().map_err(|e| e.to_string())?;
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    let outer = window.outer_size().map_err(|e| e.to_string())?;
+
+    let x = area.position.x + ((area.size.width as i32 - outer.width as i32) / 2);
+    let y = area.position.y + ((area.size.height as i32 - outer.height as i32) / 2);
+
+    window
+        .set_position(PhysicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
+
     Ok(())
 }

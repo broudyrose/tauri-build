@@ -616,21 +616,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     const w = window.__TAURI__?.window;
     if (!w) return;
 
-    const getNextMonitor = async () => {
-      const win = w.getCurrentWindow();
-      const monitors = await win.availableMonitors();
-      const cur = await win.currentMonitor();
-      if (!cur) return null;
-
-      return monitors.find(m =>
-        m.name !== cur.name ||
-        m.position?.x !== cur.position?.x ||
-        m.position?.y !== cur.position?.y ||
-        m.size?.width !== cur.size?.width ||
-        m.size?.height !== cur.size?.height
-      ) || null;
-    };
-
     if (btnClose) {
       btnClose.addEventListener("click", async () => {
         try {
@@ -642,20 +627,27 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (btnMove) {
-      btnMove.addEventListener("click", async () => {
-        try {
-          const win = w.getCurrentWindow();
-          const next = await getNextMonitor();
-          if (next) await win.setPosition(next.position);
-        } catch (e) {
-          console.error("moveWin error:", e);
-        }
-      });
+btnMove.addEventListener("click", async () => {
+  try {
+    compactMode = false;
 
+    await invoke("move_window_to_next_monitor");
+
+    applyViewportScale();
+    positionNextBadge();
+    placeNoSessionsAtFirstSlot();
+
+    await invoke("show_window");
+  } catch (e) {
+    console.error("moveWin error:", e);
+    try { await invoke("show_window"); } catch {}
+  }
+});
       (async () => {
         try {
-          const next = await getNextMonitor();
-          btnMove.style.display = next ? "" : "none";
+          const win = w.getCurrentWindow();
+          const monitors = await win.availableMonitors();
+          btnMove.style.display = monitors.length > 1 ? "" : "none";
         } catch (e) {
           console.error("moveWin detect error:", e);
           btnMove.style.display = "none";

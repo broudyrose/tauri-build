@@ -399,5 +399,8 @@ body:hover #winControls,
   pointer-events:auto;
 }
 
-#moveWin{ right:38px; }
+#moveWin{
+  right: 47px;
+  transform: translateY(-3px);
+}
 #closeWin{ right:0; }
