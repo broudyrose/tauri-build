@@ -611,7 +611,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const btnMove = document.getElementById("moveWin");
     const btnClose = document.getElementById("closeWin");
 
-    if (btnMove) btnMove.style.display = "none";
+    if (btnMove) btnMove.style.display = "";
 
     const w = window.__TAURI__?.window;
     if (!w) return;
