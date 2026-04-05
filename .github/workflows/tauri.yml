@@ -13,11 +13,12 @@ jobs:
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
+
       - uses: Swatinem/rust-cache@v2
         with:
-        workspaces: ./src-tauri -> target
-        shared-key: tauri-windows-cache
-        save-if: ${{ github.ref == 'refs/heads/main' }}
+          workspaces: ./src-tauri -> target
+          shared-key: tauri-windows-cache
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - run: npm install
       - run: npm run tauri build -- --no-bundle
