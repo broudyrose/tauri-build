@@ -133,7 +133,7 @@ export function renderFive(items) {
 
   const first = items[0] ?? null;
   const rest = items;
-
+ 
   strip.innerHTML = `
     <div class="sessionsLayout">
       <div class="heroColumn">
