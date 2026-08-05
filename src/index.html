@@ -7,25 +7,18 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div id="bg">
-      <div id="bgA" class="bgLayer"></div>
-      <div id="bgB" class="bgLayer"></div>
-      <div id="vignette"></div>
-    </div>
+    <div id="bg" aria-hidden="true"></div>
 
     <div id="viewport">
       <div id="scene">
-        <div id="strip" aria-label="Upcoming posters"></div>
+        <div id="strip" aria-label="Upcoming sessions"></div>
         <div id="nextBadge">Далее</div>
-        <div id="noSessions" style="display:none;">
-          Сегодня сеансов нет!<br>Ждём вас завтра!
-        </div>
       </div>
     </div>
 
     <div id="winControls">
       <button id="pinWin">★</button>
-      <button id="closeWin">✖</button>
+      <button id="closeWin">×</button>
     </div>
 
     <script type="module" src="./main.js"></script>

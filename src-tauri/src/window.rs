@@ -1,5 +1,10 @@
 use tauri::{LogicalSize, PhysicalPosition, WebviewWindow, Window};
 
+#[cfg(windows)]
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    SetWindowPos, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER,
+};
+
 fn center_on_monitor<R: tauri::Runtime>(
     window: &tauri::WebviewWindow<R>,
     monitor: &tauri::Monitor,
@@ -24,6 +29,49 @@ fn set_window_size(window: &Window, width: f64, height: f64) -> Result<(), Strin
         .set_size(LogicalSize::new(width, height))
         .map_err(|e| e.to_string())
 }
+#[cfg(windows)]
+fn set_window_bounds(
+    window: &Window,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+) -> Result<(), String> {
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+    let ok = unsafe {
+        SetWindowPos(
+            hwnd.0 as _,
+            std::ptr::null_mut(),
+            x,
+            y,
+            width,
+            height,
+            SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE,
+        )
+    };
+
+    if ok == 0 {
+        Err(std::io::Error::last_os_error().to_string())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+fn set_window_bounds(
+    window: &Window,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+) -> Result<(), String> {
+    window
+        .set_position(PhysicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_size(tauri::PhysicalSize::new(width as u32, height as u32))
+        .map_err(|e| e.to_string())
+}
 
 #[tauri::command]
 pub fn toggle_window_size_and_center(window: Window, compact: bool) -> Result<(), String> {
@@ -35,29 +83,23 @@ pub fn toggle_window_size_and_center(window: Window, compact: bool) -> Result<()
 
     let monitor = window.current_monitor().map_err(|e| e.to_string())?;
 
-    window.hide().map_err(|e| e.to_string())?;
-    set_window_size(&window, target_w, target_h)?;
-
     if let Some(monitor) = monitor {
         let area = monitor.work_area();
         let scale = monitor.scale_factor();
 
         let w = (target_w * scale).round() as i32;
         let h = (target_h * scale).round() as i32;
-
         let x = area.position.x + ((area.size.width as i32 - w) / 2);
         let y = area.position.y + ((area.size.height as i32 - h) / 2);
 
-        window
-            .set_position(PhysicalPosition::new(x, y))
-            .map_err(|e| e.to_string())?;
+        set_window_bounds(&window, x, y, w, h)?;
     } else {
+        set_window_size(&window, target_w, target_h)?;
         window.center().map_err(|e| e.to_string())?;
     }
 
     Ok(())
 }
-
 #[tauri::command]
 pub fn show_window(window: Window) -> Result<(), String> {
     window.show().map_err(|e| e.to_string())?;
@@ -120,7 +162,11 @@ pub fn place_window_on_preferred_monitor(window: &WebviewWindow) -> Result<(), S
         return Ok(());
     }
 
-    let target = if monitors.len() > 1 { &monitors[1] } else { &monitors[0] };
+    let target = if monitors.len() > 1 {
+        &monitors[1]
+    } else {
+        &monitors[0]
+    };
 
     window
         .set_size(LogicalSize::new(1280.0, 704.0))

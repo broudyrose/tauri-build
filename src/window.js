@@ -86,7 +86,7 @@ export function createWindowController({
 
     e.preventDefault();
     stopPointer();
-    await handleToggleCompact();
+    await handleMove();
   }
 
   function bindDrag() {
@@ -118,7 +118,7 @@ export function createWindowController({
 
     viewport.addEventListener("pointerup", async (e) => {
       if (e.button === 0 && !dragStarted && !e.target.closest("#closeWin, #pinWin")) {
-        await handleMove();
+        await handleToggleCompact();
       }
       stopPointer();
     });
