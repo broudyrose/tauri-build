@@ -1,3 +1,5 @@
+const WINDOW_CONTROLS_IDLE_MS = 7000;
+
 export function createWindowController({
   invoke,
   applyViewportScale,
@@ -10,6 +12,29 @@ export function createWindowController({
   let viewport = null;
   let dragStart = null;
   let dragStarted = false;
+  let controlsIdleTimer = 0;
+
+  function hideWindowControls() {
+    window.clearTimeout(controlsIdleTimer);
+    controlsIdleTimer = 0;
+    document.body.classList.remove("window-controls-visible");
+  }
+
+  function showWindowControls() {
+    document.body.classList.add("window-controls-visible");
+    window.clearTimeout(controlsIdleTimer);
+    controlsIdleTimer = window.setTimeout(
+      hideWindowControls,
+      WINDOW_CONTROLS_IDLE_MS
+    );
+  }
+
+  function bindWindowControlsVisibility() {
+    window.addEventListener("pointermove", showWindowControls, { passive: true });
+    window.addEventListener("pointerdown", showWindowControls, { passive: true });
+    document.documentElement.addEventListener("pointerleave", hideWindowControls);
+    window.addEventListener("blur", hideWindowControls);
+  }
 
   function stopPointer() {
     dragStart = null;
@@ -139,6 +164,7 @@ export function createWindowController({
     viewport = document.getElementById("scene");
     bindButtons();
     bindDrag();
+    bindWindowControlsVisibility();
     await syncCompactModeFromWindow();
     applyViewportScale();
     await syncPinButton();

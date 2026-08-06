@@ -27,7 +27,8 @@ pub fn run() {
                 }
             }
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window::place_window_on_preferred_monitor(&window);
+                let _ = window::move_window_to_next_monitor(window.clone());
+                let _ = window::show_window(window);
             }
             Ok(())
         })

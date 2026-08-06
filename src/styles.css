@@ -992,13 +992,13 @@ body {
   width: 32px;
   height: 62px;
   opacity: 0;
-  pointer-events: auto;
+  pointer-events: none;
   transition: opacity 0.4s;
 }
 
-body:hover #winControls,
-#winControls:hover {
+body.window-controls-visible #winControls {
   opacity: 1;
+  pointer-events: auto;
 }
 
 #winControls button {
