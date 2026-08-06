@@ -54,40 +54,10 @@ fn has_runtime_data(dir: &Path) -> bool {
     dir.join("db.db").exists() && dir.join("media").exists()
 }
 
-fn find_data_root_from(mut dir: PathBuf) -> Option<PathBuf> {
-    for _ in 0..10 {
-        if has_runtime_data(&dir) {
-            return Some(dir);
-        }
-
-        dir = dir.parent()?.to_path_buf();
-    }
-
-    None
-}
-
 pub(crate) fn find_project_root() -> Option<PathBuf> {
-    let mut candidates = Vec::new();
-
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            candidates.push(dir.to_path_buf());
-        }
-    }
-
-    candidates.push(PathBuf::from(r"C:\cargo-target\debug"));
-
-    if let Ok(dir) = std::env::current_dir() {
-        candidates.push(dir);
-    }
-
-    for candidate in candidates {
-        if let Some(root) = find_data_root_from(candidate) {
-            return Some(root);
-        }
-    }
-
-    None
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?.to_path_buf();
+    has_runtime_data(&dir).then_some(dir)
 }
 
 fn read_poster_as_data_url(project_root: &Path, film_id: i64) -> Option<String> {
