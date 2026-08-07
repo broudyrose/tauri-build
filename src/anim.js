@@ -689,7 +689,8 @@ function planEnteringRows(
   rows,
   startRows,
   endRows,
-  displacedStartIndices = new Set()
+  displacedStartIndices = new Set(),
+  promotedStartIndices = new Set()
 ) {
   if (!rows.length) return [];
   const scale = getSceneScale();
@@ -716,11 +717,17 @@ function planEnteringRows(
       && retainedMoves.some((move) => move.endIndex < move.startIndex);
     const replacesDisplacedRightEdge = destinationIndex === maxEndIndex
       && displacedStartIndices.has(destinationIndex);
+    const replacesPromotedSlot = promotedStartIndices.has(destinationIndex);
 
     if (replenishesRightEdge) {
       return { element, route: "right-edge", stepPx, fadeDelay: 0 };
     }
-    if (opensInteriorGap || vacatesDestination || replacesDisplacedRightEdge) {
+    if (
+      opensInteriorGap
+      || vacatesDestination
+      || replacesDisplacedRightEdge
+      || replacesPromotedSlot
+    ) {
       return {
         element,
         route: "vacated-slot",
@@ -910,11 +917,17 @@ async function performLayoutTransition(
       .map((ghost) => startRows.get(String(ghost.rid))?.index)
       .filter((index) => Number.isFinite(index))
   );
+  const promotedStartIndices = new Set(
+    promoted
+      .map((ghost) => startRows.get(String(ghost.rid))?.index)
+      .filter((index) => Number.isFinite(index))
+  );
   const entryPlans = planEnteringRows(
     enteringRows,
     retainedStartRows,
     endRows,
-    displacedStartIndices
+    displacedStartIndices,
+    promotedStartIndices
   );
   const addedCount = enteringRows.length;
 
