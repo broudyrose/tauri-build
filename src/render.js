@@ -502,6 +502,18 @@ function firstTitleSeparatorOutsideQuotes(value) {
 }
 
 function splitHeroTitle(title) {
+  const masterClassMatch = /^(мастер(?:[\s\-‐‑‒–—]+)класс)(?![\p{L}\p{N}_])/iu.exec(title);
+  if (masterClassMatch) {
+    const wordEnd = masterClassMatch[1].length;
+    const subtitle = title.slice(wordEnd).trim();
+    if (subtitle) {
+      return {
+        title: title.slice(0, wordEnd).trim(),
+        subtitle,
+      };
+    }
+  }
+
   const categoryMatch = /(^|[^\p{L}\p{N}_])(концерт|экскурсия)(?![\p{L}\p{N}_])/iu.exec(title);
   if (categoryMatch) {
     const wordEnd = categoryMatch.index + categoryMatch[1].length + categoryMatch[2].length;
