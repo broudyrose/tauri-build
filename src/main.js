@@ -44,6 +44,64 @@ const POSTER_DURATION_MS = 18000; // Полное время размытой а
 const HEADER_DURATION_MS = 18000; // Полное время одиночного хедера от появления до исчезновения.
 const GALLERY_SLIDE_DURATION_MS = 18000; // Полное время каждого файла gallery от появления до исчезновения.
 const TRANSITION_SETTLE_POLL_MS = 100;
+const TRAILER_RANGE_ENABLED = true; // Использовать start/end из trailer.json, не изменяя сам видеофайл.
+
+function trailerRangeValue(video, name) {
+  const raw = video?.dataset?.[name];
+  if (raw === undefined || raw === "") return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function resolveTrailerRange(video) {
+  const duration = Number(video?.duration);
+  if (!Number.isFinite(duration) || duration <= 0) return null;
+
+  const fullRange = { start: 0, end: duration, active: false };
+  if (!TRAILER_RANGE_ENABLED) return fullRange;
+
+  const requestedStart = trailerRangeValue(video, "trailerStart");
+  const requestedEnd = trailerRangeValue(video, "trailerEnd");
+  if (requestedStart === null && requestedEnd === null) return fullRange;
+
+  const start = Math.min(duration, Math.max(0, requestedStart ?? 0));
+  const end = Math.min(duration, Math.max(0, requestedEnd ?? duration));
+  if (end <= start) return fullRange;
+
+  return {
+    start,
+    end,
+    active: start > 0 || end < duration,
+  };
+}
+
+function seekVideoToRangeStart(video, range) {
+  if (!range || Math.abs(Number(video.currentTime) - range.start) < 0.001) return;
+  try {
+    video.currentTime = range.start;
+  } catch {}
+}
+
+function isAdvertisingVideo(video) {
+  return video.closest(".heroSession")?.dataset.advertising === "true";
+}
+
+function playOrdinaryTrailer(video, { restart = false } = {}) {
+  if (!(video instanceof HTMLVideoElement) || isAdvertisingVideo(video)) return;
+  const range = resolveTrailerRange(video);
+  if (!range) return;
+
+  video.loop = !range.active;
+  if (restart || Number(video.currentTime) < range.start) {
+    seekVideoToRangeStart(video, range);
+  }
+  const playback = video.play();
+  playback?.catch((error) => {
+    if (video.isConnected && error?.name !== "AbortError") {
+      console.error("ordinary video error:", error);
+    }
+  });
+}
 
 async function loadBoardFonts() {
   if (!document.fonts) return;
@@ -69,11 +127,32 @@ window.addEventListener("DOMContentLoaded", async () => {
   let advertisingVideoError = null;
   let advertisingVideoPlaying = null;
   let advertisingVideoTimeUpdate = null;
+  let advertisingVideoLoadedMetadata = null;
   let ordinaryGalleryTimer = 0;
   let ordinaryGalleryRevision = 0;
   let ordinaryGalleryKey = "";
   let ordinaryGalleryPaths = [];
   let ordinaryGalleryIndex = 0;
+
+  document.addEventListener("loadedmetadata", (event) => {
+    playOrdinaryTrailer(event.target, { restart: true });
+  }, true);
+  document.addEventListener("timeupdate", (event) => {
+    const video = event.target;
+    if (!(video instanceof HTMLVideoElement) || isAdvertisingVideo(video)) return;
+    const range = resolveTrailerRange(video);
+    if (
+      !range?.active
+      || Number(video.currentTime) < range.end
+    ) return;
+    playOrdinaryTrailer(video, { restart: true });
+  }, true);
+  document.addEventListener("ended", (event) => {
+    const video = event.target;
+    if (!(video instanceof HTMLVideoElement) || isAdvertisingVideo(video)) return;
+    const range = resolveTrailerRange(video);
+    if (range?.active) playOrdinaryTrailer(video, { restart: true });
+  }, true);
 
   const compactModeRef = {
     get: () => compactMode,
@@ -262,11 +341,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (advertisingVideo && advertisingVideoTimeUpdate) {
       advertisingVideo.removeEventListener("timeupdate", advertisingVideoTimeUpdate);
     }
+    if (advertisingVideo && advertisingVideoLoadedMetadata) {
+      advertisingVideo.removeEventListener("loadedmetadata", advertisingVideoLoadedMetadata);
+    }
     advertisingVideo = null;
     advertisingVideoEnded = null;
     advertisingVideoError = null;
     advertisingVideoPlaying = null;
     advertisingVideoTimeUpdate = null;
+    advertisingVideoLoadedMetadata = null;
   };
 
   const queueAdvertisingAdvance = () => {
@@ -351,10 +434,10 @@ window.addEventListener("DOMContentLoaded", async () => {
       };
       advertisingVideoTimeUpdate = () => {
         if (revision !== advertisingRevision) return;
-        const duration = Number(video.duration);
+        const range = resolveTrailerRange(video);
         const currentTime = Number(video.currentTime);
-        if (!Number.isFinite(duration) || !Number.isFinite(currentTime) || duration <= 0) return;
-        const remainingMs = Math.max(0, (duration - currentTime) * 1000);
+        if (!range || !Number.isFinite(currentTime)) return;
+        const remainingMs = Math.max(0, (range.end - currentTime) * 1000);
         if (remainingMs <= HERO_BACKGROUND_FADE_MS) advanceProgram();
       };
       advertisingVideoError = (reason) => {
@@ -379,11 +462,19 @@ window.addEventListener("DOMContentLoaded", async () => {
       video.addEventListener("playing", advertisingVideoPlaying, { once: true });
       video.addEventListener("timeupdate", advertisingVideoTimeUpdate);
       video.classList.remove("is-playing");
-      try {
-        video.currentTime = 0;
-      } catch {}
-      const playback = video.play();
-      playback?.catch((error) => advertisingVideoError(error));
+      const beginPlayback = () => {
+        advertisingVideoLoadedMetadata = null;
+        if (revision !== advertisingRevision) return;
+        seekVideoToRangeStart(video, resolveTrailerRange(video));
+        const playback = video.play();
+        playback?.catch((error) => advertisingVideoError(error));
+      };
+      if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        beginPlayback();
+      } else {
+        advertisingVideoLoadedMetadata = beginPlayback;
+        video.addEventListener("loadedmetadata", beginPlayback, { once: true });
+      }
     };
 
     arm();

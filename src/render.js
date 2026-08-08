@@ -434,11 +434,30 @@ function fileSrc(path) {
   return typeof convertFileSrc === "function" ? convertFileSrc(path) : path;
 }
 
+function trailerRangeNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+function trailerRangeAttributes(item) {
+  const start = trailerRangeNumber(item?.trailer_start);
+  const end = trailerRangeNumber(item?.trailer_end);
+  const attributes = [];
+  if (start !== null) attributes.push(`data-trailer-start="${escapeHtml(String(start))}"`);
+  if (end !== null) attributes.push(`data-trailer-end="${escapeHtml(String(end))}"`);
+  return {
+    hasRange: attributes.length > 0,
+    html: attributes.length ? ` ${attributes.join(" ")}` : "",
+  };
+}
+
 function heroMediaHtml(item) {
   const trailer = fileSrc(item?.trailer_path);
   if (trailer) {
-    const playback = item?.advertising ? "" : " autoplay loop";
-    return `<video class="heroMedia heroMediaVideo" src="${escapeHtml(trailer)}"${playback} muted playsinline preload="metadata"></video>`;
+    const range = trailerRangeAttributes(item);
+    const playback = item?.advertising || range.hasRange ? "" : " autoplay loop";
+    return `<video class="heroMedia heroMediaVideo" src="${escapeHtml(trailer)}"${playback}${range.html} muted playsinline preload="metadata"></video>`;
   }
 
   const galleryImage = Array.isArray(item?.gallery_paths)

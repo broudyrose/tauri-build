@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 
@@ -23,6 +23,15 @@ pub struct PosterItem {
     pub gallery_paths: Vec<String>,
     pub header_path: Option<String>,
     pub trailer_path: Option<String>,
+    pub trailer_start: Option<f64>,
+    pub trailer_end: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TrailerRangeFile {
+    // Временные точки задаются в секундах исходного видео.
+    start: Option<f64>,
+    end: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -78,6 +87,35 @@ fn find_media_path(project_root: &Path, film_id: i64, names: &[&str]) -> Option<
         let path = media_dir.join(name);
         path.is_file().then(|| path.to_string_lossy().into_owned())
     })
+}
+
+fn read_trailer_range(project_root: &Path, film_id: i64) -> (Option<f64>, Option<f64>) {
+    let path = project_root
+        .join("media")
+        .join(film_id.to_string())
+        .join("trailer.json");
+    let Ok(contents) = std::fs::read_to_string(path) else {
+        return (None, None);
+    };
+    let Ok(range) = serde_json::from_str::<TrailerRangeFile>(&contents) else {
+        return (None, None);
+    };
+
+    let start = match range.start {
+        Some(value) if value.is_finite() && value >= 0.0 => Some(value),
+        Some(_) => return (None, None),
+        None => None,
+    };
+    let end = match range.end {
+        Some(value) if value.is_finite() && value > 0.0 => Some(value),
+        Some(_) => return (None, None),
+        None => None,
+    };
+    if matches!((start, end), (Some(start), Some(end)) if end <= start) {
+        return (None, None);
+    }
+
+    (start, end)
 }
 
 fn gallery_image_name(path: &Path) -> Option<String> {
@@ -222,6 +260,8 @@ fn map_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PosterItem> {
         gallery_paths: Vec::new(),
         header_path: None,
         trailer_path: None,
+        trailer_start: None,
+        trailer_end: None,
     })
 }
 
@@ -244,6 +284,8 @@ fn map_catalog_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PosterItem> {
         gallery_paths: Vec::new(),
         header_path: None,
         trailer_path: None,
+        trailer_start: None,
+        trailer_end: None,
     })
 }
 
@@ -258,6 +300,9 @@ fn enrich_media(project_root: &Path, items: &mut [PosterItem]) {
         );
         item.trailer_path =
             find_media_path(project_root, item.id, &["trailer.mp4", "trailer.webm"]);
+        if item.trailer_path.is_some() {
+            (item.trailer_start, item.trailer_end) = read_trailer_range(project_root, item.id);
+        }
     }
 }
 
@@ -456,5 +501,35 @@ mod tests {
         );
 
         std::fs::remove_dir_all(root).expect("gallery fixture must be removed");
+    }
+
+    #[test]
+    fn trailer_range_is_read_from_sidecar_and_invalid_ranges_are_ignored() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "showmaster-trailer-range-{}-{nonce}",
+            std::process::id()
+        ));
+        let media_dir = root.join("media").join("42");
+        std::fs::create_dir_all(&media_dir).expect("media directory must be created");
+
+        std::fs::write(
+            media_dir.join("trailer.json"),
+            r#"{"start":4.5,"end":72.8}"#,
+        )
+        .expect("trailer range fixture must be written");
+        assert_eq!(read_trailer_range(&root, 42), (Some(4.5), Some(72.8)));
+
+        std::fs::write(
+            media_dir.join("trailer.json"),
+            r#"{"start":20.0,"end":10.0}"#,
+        )
+        .expect("invalid trailer range fixture must be written");
+        assert_eq!(read_trailer_range(&root, 42), (None, None));
+
+        std::fs::remove_dir_all(root).expect("trailer range fixture must be removed");
     }
 }

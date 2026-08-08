@@ -199,6 +199,8 @@ function itemFieldChanges(previous, next, includeHeroMedia = false) {
       || previous.header_path !== next.header_path
       || previous.active_gallery_path !== next.active_gallery_path
       || previous.trailer_path !== next.trailer_path
+      || previous.trailer_start !== next.trailer_start
+      || previous.trailer_end !== next.trailer_end
     )
   ) fields.add("media");
 

@@ -130,7 +130,9 @@ export function sameContent(a, b) {
       !sameStringList(a[i].gallery_paths, b[i].gallery_paths) ||
       a[i].header_path !== b[i].header_path ||
       a[i].active_gallery_path !== b[i].active_gallery_path ||
-      a[i].trailer_path !== b[i].trailer_path
+      a[i].trailer_path !== b[i].trailer_path ||
+      a[i].trailer_start !== b[i].trailer_start ||
+      a[i].trailer_end !== b[i].trailer_end
     ) return false;
   }
 
