@@ -61,7 +61,11 @@ export async function fetchUpcoming(invoke, limit = FETCH_SESSIONS, nowOverride 
     }
 
     latestVxodValue = normalizeVxodValue(snapshot?.vxod_value);
-    const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
+    const sortByTimeStatus = snapshot?.sort_by_time_status !== false;
+    const items = (Array.isArray(snapshot?.items) ? snapshot.items : []).map((item) => ({
+      ...item,
+      sort_by_time_status: sortByTimeStatus,
+    }));
     const knownRids = Array.isArray(snapshot?.upcoming_rids)
       ? snapshot.upcoming_rids
       : items.map((item) => item.rid);
@@ -118,6 +122,7 @@ export function sameContent(a, b) {
       a[i].rid !== b[i].rid ||
       a[i].id !== b[i].id ||
       a[i].advertising !== b[i].advertising ||
+      a[i].sort_by_time_status !== b[i].sort_by_time_status ||
       a[i].time !== b[i].time ||
       a[i].title !== b[i].title ||
       a[i].age !== b[i].age ||

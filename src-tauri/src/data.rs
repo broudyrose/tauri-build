@@ -39,6 +39,7 @@ pub struct BoardSnapshot {
     pub items: Vec<PosterItem>,
     pub upcoming_rids: Vec<i64>,
     pub upcoming_schedule: Vec<UpcomingSession>,
+    pub sort_by_time_status: bool,
     pub vxod_value: u8,
 }
 
@@ -54,6 +55,7 @@ impl BoardSnapshot {
             items: Vec::new(),
             upcoming_rids: Vec::new(),
             upcoming_schedule: Vec::new(),
+            sort_by_time_status: true,
             vxod_value: 2,
         }
     }
@@ -427,6 +429,7 @@ pub fn get_upcoming_posters(limit: Option<u32>, now: String) -> BoardSnapshot {
         items,
         upcoming_rids,
         upcoming_schedule,
+        sort_by_time_status: runtime_config.sort_by_time_status,
         vxod_value: runtime_config.vxod_value,
     }
 }

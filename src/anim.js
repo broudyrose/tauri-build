@@ -180,6 +180,7 @@ function itemFieldChanges(previous, next, includeHeroMedia = false) {
   const fields = new Set();
   if (!previous || !next) return fields;
 
+  if (previous.sort_by_time_status !== next.sort_by_time_status) fields.add("scheduleMode");
   if (previous.time !== next.time) fields.add("time");
   if (previous.title !== next.title) fields.add("title");
   if (previous.duration !== next.duration) fields.add("duration");
@@ -406,7 +407,7 @@ function planHeroSwap(currentItems, nextItems) {
   }
 
   const changed = itemFieldChanges(current, next, true);
-  const swapContent = ["time", "title", "duration", "age", "hall", "price"]
+  const swapContent = ["scheduleMode", "time", "title", "duration", "age", "hall", "price"]
     .some((field) => changed.has(field));
   const swapMedia = changed.has("media");
   return swapContent || swapMedia ? { swapContent, swapMedia } : null;

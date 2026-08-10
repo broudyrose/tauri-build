@@ -814,6 +814,7 @@ function heroHtml(item) {
   const title = splitHeroTitle(normalized.title);
   const hasTrailer = Boolean(item.trailer_path);
   const advertising = Boolean(item.advertising);
+  const sortByTime = item.sort_by_time_status !== false;
 
   return `
     <section class="heroSession${hasTrailer ? " has-trailer" : ""}${advertising ? " is-advertising" : ""}" data-rid="${item.rid}" data-time="${escapeHtml(item.time)}" data-advertising="${advertising}">
@@ -825,7 +826,7 @@ function heroHtml(item) {
       </div>
       <div class="heroContent">
         <div class="heroText">
-          <div class="heroSchedule">${advertising ? "В репертуаре" : `Далее в ${escapeHtml(item.time)}`}</div>
+          <div class="heroSchedule">${advertising ? "В репертуаре" : `${sortByTime ? "Далее в" : "В"} ${escapeHtml(item.time)}`}</div>
           <div class="heroTitleGroup">
             ${normalized.isPremiere ? `<div class="heroKicker" data-shine-text="Премьера!">Премьера!</div>` : ""}
             <h1 class="heroTitle" data-fit-height="72" data-fit-min="24" data-shine-text="${escapeHtml(title.title)}">${escapeHtml(title.title)}</h1>
@@ -905,6 +906,7 @@ export function renderFive(items, options = {}) {
   const heroItem = items[0] || null;
   const cardItems = items.slice(1);
   const advertising = Boolean(heroItem?.advertising);
+  const sortByTime = heroItem?.sort_by_time_status !== false;
 
   if (!preserveHero) {
     heroMount.classList.toggle("has-trailer", Boolean(heroItem?.trailer_path));
@@ -918,7 +920,7 @@ export function renderFive(items, options = {}) {
   };
   updateScheduleDivider(
     divider,
-    advertising ? "Ещё" : "Позже сегодня",
+    advertising ? "Ещё" : (sortByTime ? "Позже сегодня" : "Позже"),
     cardItems.length > 0
   );
   if (!preserveRows) {
