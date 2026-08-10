@@ -196,6 +196,7 @@ async function transitionEntranceNotice(block, label, text, revision) {
   const duration = cssTimeMs("--card-standard-fade-ms", 1500);
   const hidden = block.classList.contains("is-hidden");
   const currentOpacity = Number.parseFloat(getComputedStyle(block).opacity);
+  let fadeInStartTime = null;
 
   entranceNoticeAnimation?.cancel();
   entranceNoticeAnimation = null;
@@ -213,6 +214,9 @@ async function transitionEntranceNotice(block, label, text, revision) {
       return;
     }
     if (revision !== entranceNoticeRevision) return;
+    fadeInStartTime = Number.isFinite(fadeOut.startTime)
+      ? fadeOut.startTime + duration
+      : null;
     fadeOut.cancel();
     entranceNoticeAnimation = null;
     block.style.opacity = "";
@@ -232,6 +236,7 @@ async function transitionEntranceNotice(block, label, text, revision) {
     [{ opacity: 0 }, { opacity: 1 }],
     { duration, easing: "ease-in-out", fill: "forwards" }
   );
+  if (fadeInStartTime !== null) fadeIn.startTime = fadeInStartTime;
   entranceNoticeAnimation = fadeIn;
   try {
     await fadeIn.finished;
@@ -293,61 +298,73 @@ function setScheduleDividerInstant(divider, label, text, visible) {
   divider.style.transition = "";
 }
 
-async function transitionScheduleDivider(divider, label, text, visible, revision) {
+function transitionScheduleDivider(divider, label, text, visible, revision) {
   const duration = cssTimeMs("--hero-info-fade-ms", 1500);
   const currentlyHidden = divider.classList.contains("is-hidden");
   const currentOpacity = Number.parseFloat(getComputedStyle(divider).opacity);
+  let initialAnimation = null;
 
   divider.style.transition = "none";
   scheduleDividerAnimation?.cancel();
   scheduleDividerAnimation = null;
 
-  if (!currentlyHidden) {
-    divider.style.opacity = String(Number.isFinite(currentOpacity) ? currentOpacity : 1);
-    const fadeOut = divider.animate(
-      [{ opacity: Number.isFinite(currentOpacity) ? currentOpacity : 1 }, { opacity: 0 }],
+  void (async () => {
+    let fadeInStartTime = null;
+    if (!currentlyHidden) {
+      divider.style.opacity = String(Number.isFinite(currentOpacity) ? currentOpacity : 1);
+      const fadeOut = divider.animate(
+        [{ opacity: Number.isFinite(currentOpacity) ? currentOpacity : 1 }, { opacity: 0 }],
+        { duration, easing: "ease-in-out", fill: "forwards" }
+      );
+      initialAnimation = fadeOut;
+      scheduleDividerAnimation = fadeOut;
+      try {
+        await fadeOut.finished;
+      } catch {
+        return;
+      }
+      if (revision !== scheduleDividerRevision) return;
+      fadeInStartTime = Number.isFinite(fadeOut.startTime)
+        ? fadeOut.startTime + duration
+        : null;
+      divider.style.opacity = "0";
+      fadeOut.cancel();
+      scheduleDividerAnimation = null;
+    }
+
+    label.textContent = text;
+    divider.setAttribute("aria-label", text);
+    if (!visible) {
+      divider.classList.add("is-hidden");
+      divider.style.opacity = "";
+      void divider.offsetWidth;
+      divider.style.transition = "";
+      return;
+    }
+
+    divider.style.opacity = "0";
+    divider.classList.remove("is-hidden");
+    const fadeIn = divider.animate(
+      [{ opacity: 0 }, { opacity: 1 }],
       { duration, easing: "ease-in-out", fill: "forwards" }
     );
-    scheduleDividerAnimation = fadeOut;
+    if (fadeInStartTime !== null) fadeIn.startTime = fadeInStartTime;
+    if (!initialAnimation) initialAnimation = fadeIn;
+    scheduleDividerAnimation = fadeIn;
     try {
-      await fadeOut.finished;
+      await fadeIn.finished;
     } catch {
       return;
     }
     if (revision !== scheduleDividerRevision) return;
-    divider.style.opacity = "0";
-    fadeOut.cancel();
+    divider.style.opacity = "1";
+    fadeIn.cancel();
     scheduleDividerAnimation = null;
-  }
-
-  label.textContent = text;
-  divider.setAttribute("aria-label", text);
-  if (!visible) {
-    divider.classList.add("is-hidden");
-    divider.style.opacity = "";
-    void divider.offsetWidth;
     divider.style.transition = "";
-    return;
-  }
+    divider.style.opacity = "";
+  })();
 
-  divider.style.opacity = "0";
-  divider.classList.remove("is-hidden");
-  const fadeIn = divider.animate(
-    [{ opacity: 0 }, { opacity: 1 }],
-    { duration, easing: "ease-in-out", fill: "forwards" }
-  );
-  scheduleDividerAnimation = fadeIn;
-  try {
-    await fadeIn.finished;
-  } catch {
-    return;
-  }
-  if (revision !== scheduleDividerRevision) return;
-  divider.style.opacity = "1";
-  fadeIn.cancel();
-  scheduleDividerAnimation = null;
-  divider.style.transition = "";
-  divider.style.opacity = "";
+  return initialAnimation;
 }
 
 function updateScheduleDivider(divider, text, visible) {
@@ -369,7 +386,7 @@ function updateScheduleDivider(divider, text, visible) {
   scheduleDividerTargetText = text;
   scheduleDividerTargetVisible = visible;
   scheduleDividerRevision += 1;
-  void transitionScheduleDivider(
+  return transitionScheduleDivider(
     divider,
     label,
     text,
@@ -918,7 +935,7 @@ export function renderFive(items, options = {}) {
     createdRows: [],
     updatedRows: [],
   };
-  updateScheduleDivider(
+  const scheduleDividerAnimation = updateScheduleDivider(
     divider,
     advertising ? "Ещё" : (sortByTime ? "Позже сегодня" : "Позже"),
     cardItems.length > 0
@@ -934,7 +951,7 @@ export function renderFive(items, options = {}) {
   }
 
   fitVisibleText();
-  return renderedRows;
+  return { ...renderedRows, scheduleDividerAnimation };
 }
 
 export function applyZByOrder() {}

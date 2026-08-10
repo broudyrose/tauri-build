@@ -31,7 +31,6 @@ const CONTENT_FADE_MS = 1500; // Длительность обычного по�
 const DATA_SWAP_PHASE_MS = CONTENT_FADE_MS; // Одна фаза смены текста: 1500 мс на угасание и 1500 мс на появление.
 
 const EASE_ROW_MOVE = "cubic-bezier(0.4, 0, 0.2, 1)"; // Кривая скорости горизонтального движения карточек.
-const EASE_HERO = "cubic-bezier(0.4, 0, 0.2, 1)"; // Кривая скорости смены текста hero-блока.
 
 let pendingTransitions = [];
 let appliedKnownUpcomingRids = new Set();
@@ -471,7 +470,7 @@ function animateHeroSwap(swap) {
     add(animateIfPresent(
       swap.oldSlot.querySelector(".heroContent"),
       [{ opacity: 1 }, { opacity: 0 }],
-      { duration: DATA_SWAP_PHASE_MS, easing: EASE_HERO }
+      { duration: DATA_SWAP_PHASE_MS, easing: "ease-in-out" }
     ));
     add(animateIfPresent(
       swap.newSlot.querySelector(".heroContent"),
@@ -479,7 +478,7 @@ function animateHeroSwap(swap) {
       {
         duration: DATA_SWAP_PHASE_MS,
         delay: DATA_SWAP_PHASE_MS,
-        easing: EASE_HERO,
+        easing: "ease-in-out",
         fill: "both",
       }
     ));
@@ -492,9 +491,13 @@ function stageHeroTransition(currentItems, nextItems, renderFive) {
   const swap = prepareHeroSwap(planHeroSwap(currentItems, nextItems));
   if (!swap) return { swap: null, animations: [] };
 
-  renderFive(nextItems, { preserveRows: true });
+  const rendered = renderFive(nextItems, { preserveRows: true });
   reconcileHeroSwap(swap);
-  return { swap, animations: animateHeroSwap(swap) };
+  const animations = animateHeroSwap(swap);
+  if (rendered?.scheduleDividerAnimation) {
+    animations.push(rendered.scheduleDividerAnimation);
+  }
+  return { swap, animations };
 }
 
 function rowStepFromPositions(endRows, scale) {
