@@ -489,15 +489,29 @@ function animateHeroSwap(swap) {
 
 function stageHeroTransition(currentItems, nextItems, renderFive) {
   const swap = prepareHeroSwap(planHeroSwap(currentItems, nextItems));
-  if (!swap) return { swap: null, animations: [] };
+  const rendered = swap
+    ? renderFive(nextItems, { preserveRows: true })
+    : renderFive(nextItems, { preserveHero: true, preserveRows: true });
+  if (swap) reconcileHeroSwap(swap);
 
-  const rendered = renderFive(nextItems, { preserveRows: true });
-  reconcileHeroSwap(swap);
-  const animations = animateHeroSwap(swap);
-  if (rendered?.scheduleDividerAnimation) {
-    animations.push(rendered.scheduleDividerAnimation);
+  const animations = swap ? animateHeroSwap(swap) : [];
+  const dividerTransition = rendered?.scheduleDividerTransition;
+  const dividerRevealDelay = swap?.swapContent && dividerTransition?.entering
+    ? DATA_SWAP_PHASE_MS
+    : 0;
+  const advertisingModeChanged = Boolean(currentItems?.[0]?.advertising)
+    !== Boolean(nextItems?.[0]?.advertising);
+  const rowRevealAt = swap?.swapContent
+    && (dividerTransition?.entering || advertisingModeChanged)
+    ? DATA_SWAP_PHASE_MS
+    : 0;
+  if (dividerTransition?.animation) {
+    if (dividerRevealDelay) {
+      dividerTransition.animation.effect?.updateTiming({ delay: dividerRevealDelay });
+    }
+    animations.push(dividerTransition.animation);
   }
-  return { swap, animations };
+  return { swap, animations, rowRevealAt };
 }
 
 function rowStepFromPositions(endRows, scale) {
@@ -745,7 +759,7 @@ function planEnteringRows(
   });
 }
 
-function animateEnteringRows(entryPlans) {
+function animateEnteringRows(entryPlans, minimumFadeDelay = 0) {
   const animations = [];
 
   entryPlans.forEach(({ element, route, stepPx, fadeDelay }) => {
@@ -763,7 +777,7 @@ function animateEnteringRows(entryPlans) {
       [{ opacity: 0 }, { opacity: 1 }],
       {
         duration: CONTENT_FADE_MS,
-        delay: fadeDelay,
+        delay: Math.max(fadeDelay, minimumFadeDelay),
         easing: "ease-in-out",
         fill: "both",
       }
@@ -840,8 +854,11 @@ async function performSequenceTransition(
   );
   const heroTransition = stageHeroTransition(current, nextItems, renderFive);
   const removalAnimations = removed.flatMap(animateRemovedCard);
-  synchronizeAnimationStart([...removalAnimations, ...heroTransition.animations]);
-  await settleAnimations(removalAnimations);
+  const hasRemovalPhase = removalAnimations.length > 0;
+  if (hasRemovalPhase) {
+    synchronizeAnimationStart([...removalAnimations, ...heroTransition.animations]);
+    await settleAnimations(removalAnimations);
+  }
   removed.forEach((ghost) => ghost.el.remove());
 
   const preReorderRows = captureRows();
@@ -865,7 +882,9 @@ async function performSequenceTransition(
     ...animateFreshRows(rendered?.createdRows || []),
     ...animateUpdatedRows(rendered?.updatedRows || []),
   ];
-  synchronizeAnimationStart(animations);
+  synchronizeAnimationStart(
+    hasRemovalPhase ? animations : [...heroTransition.animations, ...animations]
+  );
 
   await settleAnimations([...heroTransition.animations, ...animations]);
   rowTransition.rows.forEach((element) => {
@@ -896,8 +915,11 @@ async function performLayoutTransition(
 
   const heroTransition = stageHeroTransition(current, nextItems, renderFive);
   const removalAnimations = removed.flatMap(animateRemovedCard);
-  synchronizeAnimationStart([...removalAnimations, ...heroTransition.animations]);
-  await settleAnimations(removalAnimations);
+  const hasRemovalPhase = removalAnimations.length > 0;
+  if (hasRemovalPhase) {
+    synchronizeAnimationStart([...removalAnimations, ...heroTransition.animations]);
+    await settleAnimations(removalAnimations);
+  }
   removeGhosts(removed);
 
   const changed = changedRows(current, nextItems);
@@ -941,10 +963,20 @@ async function performLayoutTransition(
     ...animateRowsWithFlip(retainedStartRows, endRows),
     ...animatePromotedRowsLeft(promoted, endRows),
     ...animateDisplacedRowsRight(displaced, endRows, addedCount),
-    ...animateEnteringRows(entryPlans),
+    ...animateEnteringRows(
+      entryPlans,
+      Math.max(
+        0,
+        heroTransition.rowRevealAt - (hasRemovalPhase ? CARD_EXIT_TOTAL_MS : 0)
+      )
+    ),
     ...animateUpdatedRows(rendered?.updatedRows || []),
   ];
-  synchronizeAnimationStart(layoutAnimations);
+  synchronizeAnimationStart(
+    hasRemovalPhase
+      ? layoutAnimations
+      : [...heroTransition.animations, ...layoutAnimations]
+  );
 
   await settleAnimations([...heroTransition.animations, ...layoutAnimations]);
   removeGhosts([...promoted, ...displaced]);

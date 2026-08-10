@@ -364,7 +364,10 @@ function transitionScheduleDivider(divider, label, text, visible, revision) {
     divider.style.opacity = "";
   })();
 
-  return initialAnimation;
+  return {
+    animation: initialAnimation,
+    entering: currentlyHidden && visible,
+  };
 }
 
 function updateScheduleDivider(divider, text, visible) {
@@ -935,7 +938,7 @@ export function renderFive(items, options = {}) {
     createdRows: [],
     updatedRows: [],
   };
-  const scheduleDividerAnimation = updateScheduleDivider(
+  const scheduleDividerTransition = updateScheduleDivider(
     divider,
     advertising ? "Ещё" : (sortByTime ? "Позже сегодня" : "Позже"),
     cardItems.length > 0
@@ -951,7 +954,7 @@ export function renderFive(items, options = {}) {
   }
 
   fitVisibleText();
-  return { ...renderedRows, scheduleDividerAnimation };
+  return { ...renderedRows, scheduleDividerTransition };
 }
 
 export function applyZByOrder() {}
