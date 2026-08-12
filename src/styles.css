@@ -29,6 +29,11 @@
   --hero-title-shine-stop-tail: 66%;
   --hero-title-shine-stop-clear-right: 83%;
 
+  /* Общее затемнение фонового изображения и блока Hero */
+  --hero-global-dim-opacity: 0.0;
+  --hero-text-radial-shadow-core: 0.46;
+  --hero-text-radial-shadow-mid: 0.28;
+
   /* Настройки декоративной сетки */
   --hero-grid-opacity: 0.2;
   --hero-grid-video-opacity: 0.2;
@@ -439,6 +444,11 @@ body {
   pointer-events: none;
 }
 
+.heroShadeGlobal {
+  z-index: 1;
+  background: rgba(0, 0, 0, var(--hero-global-dim-opacity));
+}
+
 .heroShadeTop {
   bottom: auto;
   height: calc(var(--cards-h) - 0px);
@@ -447,7 +457,7 @@ body {
 
 .heroShadeBottom {
   background:
-    radial-gradient(ellipse 68% 74% at 17% 54%, rgba(0, 0, 0, 0.46) 0%, rgba(0, 0, 0, 0.28) 44%, transparent 76%),
+    radial-gradient(ellipse 68% 74% at 17% 54%, rgba(0, 0, 0, var(--hero-text-radial-shadow-core)) 0%, rgba(0, 0, 0, var(--hero-text-radial-shadow-mid)) 44%, transparent 76%),
     linear-gradient(0deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.62) 20.5%, rgba(0, 0, 0, 0.36) 43.5%, rgba(0, 0, 0, 0.14) 65.5%, transparent 88.5%);
 }
 
@@ -767,6 +777,7 @@ body {
   align-items: flex-end;
   justify-content: space-between;
   padding: 0 2px 5px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.72));
 }
 
 .cardTime {

@@ -840,6 +840,7 @@ function heroHtml(item) {
     <section class="heroSession${hasTrailer ? " has-trailer" : ""}${advertising ? " is-advertising" : ""}" data-rid="${item.rid}" data-time="${escapeHtml(item.time)}" data-advertising="${advertising}">
       <div class="heroBackdrop">
         ${heroMediaHtml(item)}
+        <div class="heroShade heroShadeGlobal"></div>
         <div class="heroShade heroShadeTop"></div>
         <div class="heroShade heroShadeBottom"></div>
         <div class="heroShade heroShadeCards"></div>
